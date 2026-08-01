@@ -87,7 +87,9 @@ function prog() {
   document.getElementById('prog').textContent = done + '/' + all.length + ' packed';
   return done === all.length;
 }
-function wOf(l) { var k = kOf(l); return (state.w[k] !== undefined && state.w[k] !== '') ? state.w[k] : (l.w == null ? '' : l.w); }
+// Inputs populate BLANK (Brian 2026-08-01: prefilled estimates had to be
+// deleted before typing actuals). The estimate shows as placeholder only.
+function wOf(l) { var k = kOf(l); return (state.w[k] !== undefined) ? state.w[k] : ''; }
 function render() {
   var c = document.getElementById('cards'); c.innerHTML = '';
   DATA.stops.forEach(function (s) {
@@ -99,7 +101,7 @@ function render() {
       var row = document.createElement('div'); row.className = 'line' + (state.d[k] ? ' done' : '');
       var right = (l.u === 'package')
         ? "<div class='pkg'>package<br>&times;" + l.qty + '</div>'
-        : "<div class='wt'><input type='number' step='0.01' min='0' inputmode='decimal' value='" + wOf(l) + "'><span>lb</span></div>";
+        : "<div class='wt'><input type='number' step='0.01' min='0' inputmode='decimal' value='" + wOf(l) + "' placeholder='" + (l.w == null ? '' : '~' + l.w) + "'><span>lb</span></div>";
       var badge = l.n ? "<span class='qty'>" + l.n + ' of ' + l.of + '</span>'
                       : "<span class='qty'>&times;" + l.qty + '</span>';
       row.innerHTML = "<button class='chk'>&#10003;</button><div class='nm'><b>" + l.item + '</b>' + badge + '</div>' + right;
