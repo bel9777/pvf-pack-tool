@@ -1,0 +1,145 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="theme-color" content="#2e4b33">
+<title>PVF Pack List</title><style>
+body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f4f2ec;color:#22301f;font-size:18px}
+header{background:#2e4b33;color:#fff;padding:14px 16px;position:sticky;top:0;z-index:2}
+header h1{margin:0;font-size:19px} header p{margin:4px 0 0;font-size:14px;opacity:.85}
+.stop{background:#fff;margin:10px 12px;border-radius:10px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.stop h2{margin:2px 0 8px;font-size:17px} .stop h2 small{color:#777;font-weight:400;font-size:13px}
+.line{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #eee}
+.chk{flex:0 0 46px;height:46px;border-radius:50%;border:3px solid #b9b3a4;background:#fff;font-size:22px;color:#fff;cursor:pointer}
+.line.done .chk{background:#2e7d32;border-color:#2e7d32}
+.line.done .nm{color:#8a8a8a;text-decoration:line-through}
+.nm{flex:1;line-height:1.25} .nm b{font-size:17px} .nm .qty{display:inline-block;background:#e8e4d8;border-radius:6px;padding:1px 7px;font-size:14px;font-weight:700;margin-left:6px}
+.wt{flex:0 0 96px;display:flex;align-items:center;gap:4px}
+.wt input{width:70px;height:46px;font-size:20px;font-weight:700;text-align:right;border:2px solid #b9b3a4;border-radius:8px;padding:2px 6px}
+.wt span{font-size:13px;color:#777}
+.pkg{flex:0 0 96px;font-size:13px;color:#777;text-align:right}
+footer{position:sticky;bottom:0;background:#fff;border-top:2px solid #e8e4d8;padding:10px 12px;display:flex;gap:10px;align-items:center;z-index:2}
+#prog{font-weight:700;font-size:16px;flex:1}
+.btn{border:0;border-radius:9px;padding:14px 16px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;text-align:center}
+#mailbtn{background:#2e4b33;color:#fff} #copybtn{background:#e8e4d8;color:#22301f}
+.hint{margin:14px;font-size:13px;color:#777;text-align:center}
+#empty{margin:40px 20px;text-align:center;color:#555;font-size:16px;line-height:1.5}
+</style></head><body>
+<header><h1 id="head">Pack list</h1><p id="sub"></p></header>
+<div id="empty" hidden>This page opens from the <b>Open pack list</b> link in
+your Park View Farm pack email — the day's orders ride inside that link.
+Open the email and tap the link.</div>
+<div id="cards"></div>
+<p class="hint" id="hint" hidden>Weights autosave on this phone — this page
+keeps working offline once it has been opened. When everything is packed,
+hit EMAIL WEIGHTS: the email queues offline and sends itself when signal
+returns.</p>
+<footer><div id="prog"></div>
+<a class="btn" id="mailbtn">EMAIL WEIGHTS</a>
+<button class="btn" id="copybtn">Copy</button></footer>
+<script>
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+
+function decodeHash() {
+  var h = location.hash.slice(1);
+  if (!h) return null;
+  try {
+    var b64 = h.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+  } catch (e) { return null; }
+}
+
+var DATA = decodeHash();
+if (!DATA) {
+  document.getElementById('empty').hidden = false;
+  document.querySelector('footer').hidden = true;
+} else {
+  document.getElementById('hint').hidden = false;
+  document.getElementById('head').textContent = 'Pack list · ' + DATA.route + ' ' + DATA.date;
+  var nl = 0; DATA.stops.forEach(function (s) { nl += s.lines.length; });
+  document.getElementById('sub').textContent = DATA.stops.length + ' stops | ' + nl + ' lines | works offline, weights autosave';
+  // remember the payload so the page still has data if it is ever reopened
+  // without the fragment (e.g. from the browser's site shortcut)
+  try { localStorage.setItem('pvf-pack-last', JSON.stringify(DATA)); } catch (e) {}
+  boot();
+}
+if (!DATA) {
+  try {
+    var last = JSON.parse(localStorage.getItem('pvf-pack-last'));
+    if (last) { DATA = last; document.getElementById('empty').hidden = true;
+      document.querySelector('footer').hidden = false;
+      document.getElementById('hint').hidden = false;
+      document.getElementById('head').textContent = 'Pack list · ' + DATA.route + ' ' + DATA.date;
+      var n2 = 0; DATA.stops.forEach(function (s) { n2 += s.lines.length; });
+      document.getElementById('sub').textContent = DATA.stops.length + ' stops | ' + n2 + ' lines | works offline, weights autosave';
+      boot(); }
+  } catch (e) {}
+}
+
+function boot() {
+var KEY = 'pvf-pack-v2-' + DATA.date + '-' + DATA.route;
+var state = {w:{}, d:{}};
+try { state = JSON.parse(localStorage.getItem(KEY)) || state; } catch (e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+function lines() { var out = []; DATA.stops.forEach(function (s) { s.lines.forEach(function (l) { out.push(l); }); }); return out; }
+function kOf(l) { return 'o' + l.o + '.' + l.i + (l.n ? '.' + l.n : ''); }
+function prog() {
+  var all = lines(), done = all.filter(function (l) { return state.d[kOf(l)]; }).length;
+  document.getElementById('prog').textContent = done + '/' + all.length + ' packed';
+  return done === all.length;
+}
+function wOf(l) { var k = kOf(l); return (state.w[k] !== undefined && state.w[k] !== '') ? state.w[k] : (l.w == null ? '' : l.w); }
+function render() {
+  var c = document.getElementById('cards'); c.innerHTML = '';
+  DATA.stops.forEach(function (s) {
+    var d = document.createElement('div'); d.className = 'stop';
+    d.innerHTML = '<h2>Stop ' + s.stop + ' · ' + s.name +
+      ' <small>#' + s.lines.map(function(l){return l.o;}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(', #') + '</small></h2>';
+    s.lines.forEach(function (l) {
+      var k = kOf(l);
+      var row = document.createElement('div'); row.className = 'line' + (state.d[k] ? ' done' : '');
+      var right = (l.u === 'package')
+        ? "<div class='pkg'>package<br>&times;" + l.qty + '</div>'
+        : "<div class='wt'><input type='number' step='0.01' min='0' inputmode='decimal' value='" + wOf(l) + "'><span>lb</span></div>";
+      var badge = l.n ? "<span class='qty'>" + l.n + ' of ' + l.of + '</span>'
+                      : "<span class='qty'>&times;" + l.qty + '</span>';
+      row.innerHTML = "<button class='chk'>&#10003;</button><div class='nm'><b>" + l.item + '</b>' + badge + '</div>' + right;
+      row.querySelector('.chk').addEventListener('click', function () {
+        state.d[k] = !state.d[k]; row.classList.toggle('done', !!state.d[k]); save(); prog(); mail();
+      });
+      var inp = row.querySelector('input');
+      if (inp) inp.addEventListener('input', function () { state.w[k] = inp.value; save(); mail(); });
+      d.appendChild(row);
+    });
+    c.appendChild(d);
+  });
+  prog(); mail();
+}
+function bodyText() {
+  var out = ['PACK WEIGHTS ' + DATA.date + ' ' + DATA.route], all = lines(), done = 0;
+  all.forEach(function (l) {
+    var k = kOf(l); if (state.d[k]) done++;
+    var nm = l.item.length > 24 ? l.item.slice(0, 24) : l.item;
+    if (l.n) nm += ' (' + l.n + ' of ' + l.of + ')';
+    out.push(l.u === 'package'
+      ? k + ' [pkg] ' + nm + ' x' + l.qty + (state.d[k] ? ' OK' : ' UNPACKED')
+      : k + ' ' + nm + ' = ' + (wOf(l) || '?') + ' lb' + (state.d[k] ? '' : ' UNPACKED'));
+  });
+  out.push('packed ' + done + '/' + all.length); out.push('END');
+  return out.join('\n');
+}
+function mail() {
+  document.getElementById('mailbtn').href = 'mailto:' + (DATA.mailto || 'brian@parkviewfamilyfarm.com') +
+    '?subject=' + encodeURIComponent('PACK WEIGHTS ' + DATA.date + ' ' + DATA.route) +
+    '&body=' + encodeURIComponent(bodyText());
+}
+document.getElementById('mailbtn').addEventListener('click', function (e) {
+  if (!prog() && !confirm('Not everything is checked off - send anyway?')) e.preventDefault();
+});
+document.getElementById('copybtn').addEventListener('click', function () {
+  var t = bodyText(), b = document.getElementById('copybtn');
+  function ok() { b.textContent = 'Copied!'; setTimeout(function () { b.textContent = 'Copy'; }, 1500); }
+  if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(ok); }
+  else { var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); ok(); }
+});
+render();
+}
+</script></body></html>
