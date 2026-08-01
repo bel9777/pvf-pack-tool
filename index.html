@@ -43,6 +43,7 @@ function decodeHash() {
   if (!h) return null;
   try {
     var b64 = h.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';  // Safari's atob wants padding
     return JSON.parse(decodeURIComponent(escape(atob(b64))));
   } catch (e) { return null; }
 }
