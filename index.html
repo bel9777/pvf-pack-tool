@@ -12,6 +12,7 @@ header h1{margin:0;font-size:19px} header p{margin:4px 0 0;font-size:14px;opacit
 .line.done .chk{background:#2e7d32;border-color:#2e7d32}
 .line.done .nm{color:#8a8a8a;text-decoration:line-through}
 .nm{flex:1;line-height:1.25} .nm b{font-size:17px} .nm .qty{display:inline-block;background:#e8e4d8;border-radius:6px;padding:1px 7px;font-size:14px;font-weight:700;margin-left:6px}
+.bundle{display:block;color:#8a5a20;font-size:12px;font-weight:700;margin-top:3px;text-transform:uppercase;letter-spacing:.03em}
 .wt{flex:0 0 96px;display:flex;align-items:center;gap:4px}
 .wt input{width:70px;height:46px;font-size:20px;font-weight:700;text-align:right;border:2px solid #b9b3a4;border-radius:8px;padding:2px 6px}
 .wt span{font-size:13px;color:#777}
@@ -103,9 +104,10 @@ function render() {
       var right = (l.u === 'package')
         ? "<div class='pkg'>package<br>&times;" + l.qty + '</div>'
         : "<div class='wt'><input type='number' step='0.01' min='0' inputmode='decimal' value='" + wOf(l) + "' placeholder='" + (l.w == null ? '' : '~' + l.w) + "'><span>lb</span></div>";
-      var badge = l.n ? "<span class='qty'>" + l.n + ' of ' + l.of + '</span>'
+      var badge = l.n ? "<span class='qty'>" + (l.part_n || l.n) + ' of ' + (l.part_of || l.of) + '</span>'
                       : "<span class='qty'>&times;" + l.qty + '</span>';
-      row.innerHTML = "<button class='chk'>&#10003;</button><div class='nm'><b>" + l.item + '</b>' + badge + '</div>' + right;
+      var bundle = l.bundle ? "<small class='bundle'>" + l.bundle + '</small>' : '';
+      row.innerHTML = "<button class='chk'>&#10003;</button><div class='nm'><b>" + l.item + '</b>' + badge + bundle + '</div>' + right;
       row.querySelector('.chk').addEventListener('click', function () {
         state.d[k] = !state.d[k]; row.classList.toggle('done', !!state.d[k]); save(); prog(); mail();
       });
@@ -122,7 +124,7 @@ function bodyText() {
   all.forEach(function (l) {
     var k = kOf(l); if (state.d[k]) done++;
     var nm = l.item.length > 24 ? l.item.slice(0, 24) : l.item;
-    if (l.n) nm += ' (' + l.n + ' of ' + l.of + ')';
+    if (l.n) nm += ' (' + (l.part_n || l.n) + ' of ' + (l.part_of || l.of) + ')';
     out.push(l.u === 'package'
       ? k + ' [pkg] ' + nm + ' x' + l.qty + (state.d[k] ? ' OK' : ' UNPACKED')
       : k + ' ' + nm + ' = ' + (wOf(l) || '?') + ' lb' + (state.d[k] ? '' : ' UNPACKED'));
