@@ -17,6 +17,7 @@ header h1{margin:0;font-size:19px} header p{margin:4px 0 0;font-size:14px;opacit
 .wt input{width:70px;height:46px;font-size:20px;font-weight:700;text-align:right;border:2px solid #b9b3a4;border-radius:8px;padding:2px 6px}
 .wt span{font-size:13px;color:#777}
 .pkg{flex:0 0 96px;font-size:13px;color:#777;text-align:right}
+.grp{display:flex;align-items:center;justify-content:space-between;padding:10px 0 4px;border-top:2px solid #e8e4d8;font-size:17px}.grp .tot{background:#2e4b33;color:#fff;border-radius:8px;padding:2px 10px;font-weight:700;font-size:18px}.line.sub{padding-left:14px;border-top:1px dashed #eee} .line.sub .nm{color:#555;font-size:16px}
 footer{position:sticky;bottom:0;background:#fff;border-top:2px solid #e8e4d8;padding:10px 12px;display:flex;gap:10px;align-items:center;z-index:2}
 #prog{font-weight:700;font-size:16px;flex:1}
 .btn{border:0;border-radius:9px;padding:14px 16px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;text-align:center}
@@ -92,28 +93,65 @@ function prog() {
 // Inputs populate BLANK (Brian 2026-08-01: prefilled estimates had to be
 // deleted before typing actuals). The estimate shows as placeholder only.
 function wOf(l) { var k = kOf(l); return (state.w[k] !== undefined) ? state.w[k] : ''; }
+// Group each stop's lines by product: bundle parts and individually ordered
+// packs of the same cut land together under ONE total (Brian 2026-10-16:
+// "I just need to know how many of each item to pack for each customer").
+// Piece keys (kOf) are unchanged, so SEND WEIGHTS + the GrazeCart update
+// still sum per order line.
+var DROPW = {chicken: 1, bird: 1};
+function pkey(name) {
+  var w = name.toLowerCase().replace(/[^a-z0-9 -]/g, ' ').split(/ +/).filter(function (x) {
+    return x && x !== '-' && !DROPW[x];
+  }).map(function (x) { return (x.length > 3 && /[^s]s$/.test(x)) ? x.slice(0, -1) : x; });
+  return w.length ? w.sort().join(' ') : name.toLowerCase();
+}
+function cnt(l) { return l.u === 'package' ? (parseInt(l.qty, 10) || 1) : 1; }
+function groupsOf(s) {
+  var out = [], by = {};
+  s.lines.forEach(function (l) {
+    var k = pkey(l.item), g = by[k];
+    if (!g) { g = by[k] = {name: '', lines: [], total: 0}; out.push(g); }
+    if (!g.name || (!l.bundle && g.bundleName)) { g.name = l.item; g.bundleName = !!l.bundle; }
+    g.lines.push(l); g.total += cnt(l);
+  });
+  return out;
+}
 function render() {
   var c = document.getElementById('cards'); c.innerHTML = '';
   DATA.stops.forEach(function (s) {
     var d = document.createElement('div'); d.className = 'stop';
+    var gs = groupsOf(s), items = 0; gs.forEach(function (g) { items += g.total; });
     d.innerHTML = '<h2>Stop ' + s.stop + ' · ' + s.name +
-      ' <small>#' + s.lines.map(function(l){return l.o;}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(', #') + '</small></h2>';
-    s.lines.forEach(function (l) {
-      var k = kOf(l);
-      var row = document.createElement('div'); row.className = 'line' + (state.d[k] ? ' done' : '');
-      var right = (l.u === 'package')
-        ? "<div class='pkg'>package<br>&times;" + l.qty + '</div>'
-        : "<div class='wt'><input type='number' step='0.01' min='0' inputmode='decimal' value='" + wOf(l) + "' placeholder='" + (l.w == null ? '' : '~' + l.w) + "'><span>lb</span></div>";
-      var badge = l.n ? "<span class='qty'>" + (l.part_n || l.n) + ' of ' + (l.part_of || l.of) + '</span>'
-                      : "<span class='qty'>&times;" + l.qty + '</span>';
-      var bundle = l.bundle ? "<small class='bundle'>" + l.bundle + '</small>' : '';
-      row.innerHTML = "<button class='chk'>&#10003;</button><div class='nm'><b>" + l.item + '</b>' + badge + bundle + '</div>' + right;
-      row.querySelector('.chk').addEventListener('click', function () {
-        state.d[k] = !state.d[k]; row.classList.toggle('done', !!state.d[k]); save(); prog(); mail();
+      ' <small>' + items + ' items · #' + s.lines.map(function(l){return l.o;}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(', #') + '</small></h2>';
+    gs.forEach(function (g) {
+      var multi = g.lines.length > 1;
+      if (multi) {
+        var h = document.createElement('div'); h.className = 'grp';
+        h.innerHTML = '<b>' + g.name + "</b><span class='tot'>" + g.total + '</span>';
+        d.appendChild(h);
+      }
+      var piece = 0;
+      g.lines.forEach(function (l) {
+        var k = kOf(l);
+        var row = document.createElement('div'); row.className = 'line' + (multi ? ' sub' : '') + (state.d[k] ? ' done' : '');
+        var right = (l.u === 'package')
+          ? "<div class='pkg'>package<br>&times;" + l.qty + '</div>'
+          : "<div class='wt'><input type='number' step='0.01' min='0' inputmode='decimal' value='" + wOf(l) + "' placeholder='" + (l.w == null ? '' : '~' + l.w) + "'><span>lb</span></div>";
+        var label;
+        if (multi) {
+          if (l.u === 'package') { label = '&times;' + l.qty; }
+          else { piece += 1; label = piece + ' of ' + g.total; }
+        } else {
+          label = '<b>' + g.name + "</b><span class='qty'>" + g.total + '</span>';
+        }
+        row.innerHTML = "<button class='chk'>&#10003;</button><div class='nm'>" + label + '</div>' + right;
+        row.querySelector('.chk').addEventListener('click', function () {
+          state.d[k] = !state.d[k]; row.classList.toggle('done', !!state.d[k]); save(); prog(); mail();
+        });
+        var inp = row.querySelector('input');
+        if (inp) inp.addEventListener('input', function () { state.w[k] = inp.value; save(); mail(); });
+        d.appendChild(row);
       });
-      var inp = row.querySelector('input');
-      if (inp) inp.addEventListener('input', function () { state.w[k] = inp.value; save(); mail(); });
-      d.appendChild(row);
     });
     c.appendChild(d);
   });
