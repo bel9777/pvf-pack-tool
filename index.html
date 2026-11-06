@@ -13,6 +13,7 @@ header h1{margin:0;font-size:19px} header p{margin:4px 0 0;font-size:14px;opacit
 .line.done .nm{color:#8a8a8a;text-decoration:line-through}
 .nm{flex:1;line-height:1.25} .nm b{font-size:17px} .nm .qty{display:inline-block;background:#e8e4d8;border-radius:6px;padding:1px 7px;font-size:14px;font-weight:700;margin-left:6px}
 .bundle{display:block;color:#8a5a20;font-size:12px;font-weight:700;margin-top:3px;text-transform:uppercase;letter-spacing:.03em}
+.tag{display:block;color:#1d5fa8;font-size:15px;font-weight:800;margin-top:3px}
 .wt{flex:0 0 96px;display:flex;align-items:center;gap:4px}
 .wt input{width:70px;height:46px;font-size:20px;font-weight:700;text-align:right;border:2px solid #b9b3a4;border-radius:8px;padding:2px 6px}
 .wt span{font-size:13px;color:#777}
@@ -144,6 +145,8 @@ function render() {
         } else {
           label = '<b>' + g.name + "</b><span class='qty'>" + g.total + '</span>';
         }
+        // Turkeys carry the bird # + label weight from the turkey workbook (2026-11-06).
+        if (l.tag) label += "<span class='tag'>" + String(l.tag).replace(/[<>&]/g, '') + '</span>';
         row.innerHTML = "<button class='chk'>&#10003;</button><div class='nm'>" + label + '</div>' + right;
         row.querySelector('.chk').addEventListener('click', function () {
           state.d[k] = !state.d[k]; row.classList.toggle('done', !!state.d[k]); save(); prog(); mail();
